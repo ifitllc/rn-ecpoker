@@ -1,0 +1,26 @@
+{
+  "name": "ecpoker-v2",
+  "version": "1.0.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.48.0",
+    "expo": "^54.0.30",
+    "expo-constants": "^16.0.2",
+    "expo-status-bar": "^1.12.1",
+    "react": "^18.2.0",
+    "react-native": "0.75.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.45",
+    "@types/react-native": "0.73.0",
+    "typescript": "^5.3.3"
+  }
+}

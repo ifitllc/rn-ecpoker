@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "ECPoker",
+    "slug": "ecpoker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0f1f1a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1f1a"
+      }
+    },
+    "web": {},
+    "extra": {}
+  }
+}
