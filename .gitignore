@@ -35,4 +35,3 @@ ios/build
 # Project docs not to commit
 instructions/
 docs/
-eas-build.sh
