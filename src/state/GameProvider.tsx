@@ -4,7 +4,8 @@ import { applyRound, nextDealerSeat } from '../utils/scoreEngine';
 import { hasSupabaseConfig, supabase } from '../services/supabaseClient';
 
 interface GameContextValue extends GameState {
-  addPlayer: (name: string, seatNo: number) => void;
+  addPlayer: (name: string, seatNo: number, options?: { persist?: boolean; id?: string }) => void;
+  removePlayer: (playerId: string) => void;
   togglePlayerStatus: (playerId: string, status: PlayerStatus) => void;
   previewRound: (round: RoundInput) => void;
   confirmPendingRound: () => void;
@@ -15,15 +16,18 @@ interface GameContextValue extends GameState {
   resetGame: () => void;
 }
 
-const generateGameId = () => {
+const uuid = () => {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return `game-${Math.random().toString(36).slice(2, 10)}`;
+  // Fallback RFC4122-ish generator
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 };
 
-const generatePlayerId = () => {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
-  return Math.random().toString(36).slice(2, 10);
-};
+const generateGameId = () => uuid();
+const generatePlayerId = () => uuid();
 
 const buildInitialState = (): GameState => ({
   gameId: generateGameId(),
@@ -53,37 +57,78 @@ const replayHistory = (players: Player[], history: RoundRecord[]) => {
 const GameContext = createContext<GameContextValue | null>(null);
 
 const persistPlayer = async (player: Player) => {
-  if (!hasSupabaseConfig || !supabase) return;
+  if (!hasSupabaseConfig || !supabase) {
+    console.warn('Supabase not configured; skip player persist');
+    return;
+  }
   const { error } = await supabase.from('players').upsert({ id: player.id, name: player.name });
-  if (error) console.warn('Failed to persist player', error.message);
+  if (error) console.error('Failed to persist player', error.message);
 };
 
 const persistScores = async (gameId: string, players: Player[]) => {
-  if (!hasSupabaseConfig || !supabase) return;
-  const rows = players.map((p) => ({ game_uuid: gameId, player_id: p.id, seat_no: p.seatNo, rank: p.rank }));
+  if (!hasSupabaseConfig || !supabase) {
+    console.warn('Supabase not configured; skip scores persist');
+    return;
+  }
+  const rows = players.map((p) => ({ game_id: gameId, player_id: p.id, seat_no: p.seatNo, rank: p.rank }));
   const { error } = await supabase.from('scores').insert(rows);
-  if (error) console.warn('Failed to persist scores', error.message);
+  if (error) {
+    console.error('Failed to persist scores', error.message, { rowsCount: rows.length, gameId });
+  } else {
+    console.info('Scores persisted', { rows: rows.length, gameId });
+  }
 };
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<GameState>(buildInitialState());
 
-  const addPlayer = (name: string, seatNo: number) => {
+  const addPlayer = (name: string, seatNo: number, options?: { persist?: boolean; id?: string }) => {
+    const shouldPersist = options?.persist !== false;
     let created: Player | null = null;
     setState((prev) => {
-      if (prev.players.some((p) => p.seatNo === seatNo)) return prev;
+      const targetSeat = Math.max(1, seatNo);
+      const shifted = prev.players.map((p) =>
+        p.seatNo >= targetSeat ? { ...p, seatNo: p.seatNo + 1 } : p,
+      );
       const player: Player = {
-        id: generatePlayerId(),
+        id: options?.id ?? generatePlayerId(),
         name,
-        seatNo,
+        seatNo: targetSeat,
         rank: 2,
         status: 'active',
         joinedRound: prev.roundIndex,
       };
       created = player;
-      return { ...prev, players: [...prev.players, player].sort((a, b) => a.seatNo - b.seatNo) };
+      return { ...prev, players: [...shifted, player].sort((a, b) => a.seatNo - b.seatNo) };
     });
-    if (created) void persistPlayer(created);
+    if (created && shouldPersist) void persistPlayer(created);
+  };
+
+  const removePlayer = (playerId: string) => {
+    setState((prev) => {
+      const target = prev.players.find((p) => p.id === playerId);
+      if (!target) return prev;
+      const removedSeat = target.seatNo;
+      const remaining = prev.players
+        .filter((p) => p.id !== playerId)
+        .map((p) => (p.seatNo > removedSeat ? { ...p, seatNo: p.seatNo - 1 } : p))
+        .sort((a, b) => a.seatNo - b.seatNo);
+
+      let nextDealer = prev.currentDealerSeat;
+      if (remaining.length === 0) {
+        nextDealer = 1;
+      } else if (removedSeat < prev.currentDealerSeat) {
+        nextDealer = Math.max(1, prev.currentDealerSeat - 1);
+      } else if (removedSeat === prev.currentDealerSeat) {
+        nextDealer = nextDealerSeat(prev.currentDealerSeat, remaining);
+      }
+
+      return {
+        ...prev,
+        players: remaining,
+        currentDealerSeat: nextDealer,
+      };
+    });
   };
 
   const togglePlayerStatus = (playerId: string, status: PlayerStatus) => {
@@ -211,6 +256,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     () => ({
       ...state,
       addPlayer,
+      removePlayer,
       togglePlayerStatus,
       previewRound,
       confirmPendingRound,

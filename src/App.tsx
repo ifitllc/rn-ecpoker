@@ -6,9 +6,9 @@ import DashboardScreen from './screens/DashboardScreen';
 import GameScreen from './screens/GameScreen';
 
 const tabs = [
-  { key: 'setup', label: 'Setup' },
-  { key: 'dashboard', label: 'Leaderboard' },
-  { key: 'game', label: 'Scoring' },
+  { key: 'setup', label: 'Setup', icon: '⚙️' },
+  { key: 'dashboard', label: 'Leaderboard', icon: '🏆' },
+  { key: 'game', label: 'Scoring', icon: '✏️' },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['key'];
@@ -27,8 +27,13 @@ const AppInner = () => {
       <StatusBar barStyle="light-content" />
       <View style={styles.tabBar}>
         {tabs.map((t) => (
-          <TouchableOpacity key={t.key} style={[styles.tabButton, tab === t.key && styles.tabButtonActive]} onPress={() => setTab(t.key)}>
-            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.label}</Text>
+          <TouchableOpacity
+            key={t.key}
+            style={[styles.tabButton, tab === t.key && styles.tabButtonActive]}
+            onPress={() => setTab(t.key)}
+            accessibilityLabel={t.label}
+          >
+            <Text style={[styles.tabText, tab === t.key && styles.tabTextActive]}>{t.icon}</Text>
           </TouchableOpacity>
         ))}
       </View>

@@ -5,10 +5,12 @@ import { Player } from '../types';
 import { supabase, hasSupabaseConfig } from '../services/supabaseClient';
 
 const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') => void }> = ({ onNavigate }) => {
-  const { players, addPlayer, togglePlayerStatus, currentDealerSeat, startNewGame, resetGame } = useGame();
+  const { players, addPlayer, removePlayer, togglePlayerStatus, currentDealerSeat, startNewGame, resetGame } = useGame();
   const [name, setName] = useState('');
   const [seat, setSeat] = useState('');
+  const [seatDirty, setSeatDirty] = useState(false);
   const [recentPlayers, setRecentPlayers] = useState<{ id: string; name: string }[]>([]);
+  const [selectedRecentId, setSelectedRecentId] = useState<string | null>(null);
   const [loadingRecent, setLoadingRecent] = useState(false);
   const listRef = useRef<FlatList<Player>>(null);
 
@@ -39,20 +41,29 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
   }, []);
 
   useEffect(() => {
-    if (!seat) setSeat(String(nextSeat));
-  }, [nextSeat, seat]);
+    if (!seat && !seatDirty) setSeat(String(nextSeat));
+  }, [nextSeat, seat, seatDirty]);
 
   useEffect(() => {
     listRef.current?.scrollToEnd({ animated: true });
   }, [players.length]);
 
+  const existingNames = useMemo(() => new Set(players.map((p) => p.name.trim().toLowerCase())), [players]);
+  const recentChoices = useMemo(
+    () =>
+      recentPlayers.map((p) => ({ ...p, disabled: existingNames.has(p.name.trim().toLowerCase()) })),
+    [recentPlayers, existingNames],
+  );
+
   const handleAdd = () => {
     const parsed = parseInt(seat, 10);
     const seatNo = Number.isNaN(parsed) ? nextSeat : parsed;
     if (!name) return;
-    addPlayer(name.trim(), seatNo);
+    addPlayer(name.trim(), seatNo, { persist: !selectedRecentId, id: selectedRecentId ?? undefined });
     setName('');
     setSeat(String(seatNo + 1));
+    setSeatDirty(false);
+    setSelectedRecentId(null);
   };
 
   const renderPlayer = ({ item }: { item: Player }) => (
@@ -61,12 +72,26 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
         <Text style={styles.playerName}>{item.name}</Text>
         <Text style={styles.playerMeta}>Seat {item.seatNo} · Rank {item.rank}</Text>
       </View>
-      <TouchableOpacity
-        style={[styles.chip, item.status === 'active' ? styles.activeChip : styles.frozenChip]}
-        onPress={() => togglePlayerStatus(item.id, item.status === 'active' ? 'frozen' : 'active')}
-      >
-        <Text style={styles.chipText}>{item.status === 'active' ? 'Freeze' : 'Unfreeze'}</Text>
-      </TouchableOpacity>
+      <View style={styles.rowActions}>
+        <TouchableOpacity
+          style={[styles.chip, item.status === 'active' ? styles.activeChip : styles.frozenChip]}
+          onPress={() => togglePlayerStatus(item.id, item.status === 'active' ? 'frozen' : 'active')}
+          accessibilityLabel={item.status === 'active' ? 'Freeze player' : 'Unfreeze player'}
+        >
+          <Text
+            style={[styles.chipText, item.status === 'frozen' ? styles.freezeIconFrozen : styles.freezeIconIdle]}
+          >
+            {item.status === 'active' ? '⛔' : '🚫'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.removeBtn}
+          onPress={() => removePlayer(item.id)}
+          accessibilityLabel={`Remove ${item.name}`}
+        >
+          <Text style={styles.removeText}>🗑️</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -78,7 +103,11 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
         <Text style={styles.label}>Add player</Text>
         <TextInput
           value={name}
-          onChangeText={setName}
+          onChangeText={(val) => {
+            setName(val);
+            setSelectedRecentId(null);
+          }}
+          onFocus={() => setSelectedRecentId(null)}
           style={styles.input}
           placeholder="Name"
           placeholderTextColor="#789"
@@ -86,13 +115,14 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
         <TextInput
           value={seat}
           onChangeText={setSeat}
+          onFocus={() => setSeatDirty(true)}
           keyboardType="number-pad"
           style={[styles.input, styles.inputSmall]}
           placeholder="Seat"
           placeholderTextColor="#789"
         />
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd}>
-          <Text style={styles.primaryText}>Add</Text>
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd} accessibilityLabel="Add player">
+          <Text style={styles.primaryText}>➕</Text>
         </TouchableOpacity>
       </View>
 
@@ -103,12 +133,22 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
           {!hasSupabaseConfig && <Text style={styles.suggestionMeta}>Supabase not configured</Text>}
         </View>
         <View style={styles.chipRow}>
-          {recentPlayers.length === 0 && !loadingRecent ? (
+          {recentChoices.length === 0 && !loadingRecent ? (
             <Text style={styles.suggestionMeta}>No players found</Text>
           ) : (
-            recentPlayers.map((p) => (
-              <TouchableOpacity key={p.id} style={styles.suggestionChip} onPress={() => setName(p.name)}>
-                <Text style={styles.chipText}>{p.name}</Text>
+            recentChoices.map((p) => (
+              <TouchableOpacity
+                key={p.id}
+                style={[styles.suggestionChip, p.disabled && styles.suggestionChipDisabled]}
+                onPress={() => {
+                  if (p.disabled) return;
+                  setSelectedRecentId(p.id);
+                  setName(p.name);
+                  setSeatDirty(false);
+                }}
+                disabled={p.disabled}
+              >
+                <Text style={[styles.chipText, p.disabled && styles.suggestionChipTextDisabled]}>{p.name}</Text>
               </TouchableOpacity>
             ))
           )}
@@ -124,20 +164,23 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
       />
 
       <View style={styles.footer}> 
-        <TouchableOpacity style={styles.ghostBtn} onPress={() => { resetGame(); setName(''); setSeat(''); }}>
-          <Text style={styles.secondaryText}>Reset</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryBtn} onPress={() => onNavigate('dashboard')}>
-          <Text style={styles.secondaryText}>View Leaderboard</Text>
-        </TouchableOpacity>
         <TouchableOpacity
-          style={styles.primaryBtn}
+          style={[styles.ghostBtn, styles.footerBtn]}
+          onPress={() => { resetGame(); setName(''); setSeat(''); setSeatDirty(false); setSelectedRecentId(null); }}
+          accessibilityLabel="Reset"
+        >
+          <Text style={[styles.secondaryText, styles.footerIcon]}>⟳</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.primaryBtn, styles.footerBtn]}
           onPress={() => {
             startNewGame();
             onNavigate('game');
           }}
+          accessibilityLabel="Start scoring"
         >
-          <Text style={styles.primaryText}>Start Scoring</Text>
+          <Text style={[styles.primaryText, styles.startIcon, styles.footerIcon]}>▶️</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -162,27 +205,36 @@ const styles = StyleSheet.create({
   inputSmall: { flex: 0.4 },
   primaryBtn: {
     backgroundColor: '#1f5a3c',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 10,
+    minWidth: 72,
+    alignItems: 'center',
   },
-  primaryText: { color: '#fefae0', fontWeight: '700' },
+  primaryText: { color: '#fefae0', fontWeight: '800', fontSize: 16 },
+  startIcon: { color: '#4ade80' },
+  footerIcon: { fontSize: 28 },
   secondaryBtn: {
     borderColor: '#1f5a3c',
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 10,
+    minWidth: 72,
+    alignItems: 'center',
   },
-  secondaryText: { color: '#b4c7b6', fontWeight: '600' },
+  secondaryText: { color: '#b4c7b6', fontWeight: '700', fontSize: 15 },
   ghostBtn: {
     borderColor: '#3a3f46',
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 10,
     backgroundColor: '#0f1f1a',
+    minWidth: 72,
+    alignItems: 'center',
   },
+  footerBtn: { flex: 1 },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -205,6 +257,16 @@ const styles = StyleSheet.create({
   activeChip: { backgroundColor: '#1f5a3c' },
   frozenChip: { backgroundColor: '#3a3f46' },
   chipText: { color: '#fefae0', fontWeight: '700' },
+  freezeIconFrozen: { color: '#f65a5a' },
+  freezeIconIdle: { color: '#9aa5a6' },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  removeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#3a3f46',
+  },
+  removeText: { color: '#fefae0', fontWeight: '800', fontSize: 14 },
   footer: { flexDirection: 'row', gap: 10, marginTop: 8 },
   suggestionBox: {
     backgroundColor: '#0f241c',
@@ -225,5 +287,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#10261d',
     borderWidth: 1,
     borderColor: '#1f5a3c',
+  },
+  suggestionChipDisabled: {
+    opacity: 0.4,
+  },
+  suggestionChipTextDisabled: {
+    color: '#7a857f',
   },
 });

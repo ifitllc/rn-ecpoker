@@ -117,7 +117,11 @@ const GameScreen = () => {
                     style={styles.freezeBtn}
                     onPress={() => togglePlayerStatus(p.id, p.status === 'active' ? 'frozen' : 'active')}
                   >
-                    <Text style={styles.freezeText}>{p.status === 'active' ? 'Freeze' : 'Unfreeze'}</Text>
+                    <Text
+                      style={[styles.freezeText, p.status === 'frozen' ? styles.freezeIconFrozen : styles.freezeIconIdle]}
+                    >
+                      {p.status === 'active' ? '⛔' : '🚫'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -276,4 +280,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f5a3c',
   },
   freezeText: { color: '#fefae0', fontWeight: '700', fontSize: 12 },
+  freezeIconFrozen: { color: '#f65a5a' },
+  freezeIconIdle: { color: '#9aa5a6' },
 });
