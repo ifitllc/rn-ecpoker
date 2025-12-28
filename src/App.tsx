@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
 import { GameProvider } from './state/GameProvider';
 import SetupScreen from './screens/SetupScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -49,6 +49,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f1f1a',
+    paddingTop: Platform.select({ ios: 12, android: (StatusBar.currentHeight ?? 0) + 12, default: 12 }),
   },
   tabBar: {
     flexDirection: 'row',

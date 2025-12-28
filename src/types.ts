@@ -15,18 +15,19 @@ export interface RoundRecord {
   dealerSeat: number;
   firstCallerId: string;
   helperIds: string[];
-  nonHouseScore: number; // total points for non-house
+  nonHouseScore: number; // legacy, kept for compatibility
   houseWon: boolean;
-  deckCount: number;
+  levelSteps: number;
 }
 
 export interface GameState {
   gameId: string;
-  deckCount: number;
   roundIndex: number;
   currentDealerSeat: number;
   players: Player[];
   history: RoundRecord[];
+  pendingRound: RoundInput | null;
+  pendingBasePlayers: Player[] | null;
 }
 
 export interface ScoreRow {
@@ -44,7 +45,6 @@ export interface RoundInput {
   dealerSeat: number;
   firstCallerId: string;
   helperIds: string[];
-  nonHouseScore: number;
   houseWon: boolean;
-  deckCount: number;
+  levelSteps: number;
 }

@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon-from-svg.png",
     "splash": {
+      "image": "./assets/icon-from-svg.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0f1f1a"
     },
     "assetBundlePatterns": ["**/*"],
