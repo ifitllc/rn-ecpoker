@@ -130,8 +130,8 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
           placeholder="Seat"
           placeholderTextColor="#789"
         />
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleAdd} accessibilityLabel="Add player">
-          <Text style={styles.primaryText}>➕</Text>
+        <TouchableOpacity style={[styles.primaryBtn, styles.addBtn]} onPress={handleAdd} accessibilityLabel="Add player">
+          <Text style={[styles.primaryText, styles.addText]}>➕</Text>
         </TouchableOpacity>
       </View>
 
@@ -221,6 +221,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryText: { color: '#fefae0', fontWeight: '800', fontSize: 16 },
+  addBtn: {
+    backgroundColor: '#2fd67f',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  addText: { color: '#0b1c13', fontSize: 20 },
   startIcon: { color: '#4ade80' },
   footerIcon: { fontSize: 28 },
   secondaryBtn: {

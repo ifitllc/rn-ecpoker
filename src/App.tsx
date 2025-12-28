@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Platform } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { GameProvider } from './state/GameProvider';
 import SetupScreen from './screens/SetupScreen';
 import DashboardScreen from './screens/DashboardScreen';
@@ -44,9 +45,11 @@ const AppInner = () => {
 
 export default function App() {
   return (
-    <GameProvider>
-      <AppInner />
-    </GameProvider>
+    <SafeAreaProvider>
+      <GameProvider>
+        <AppInner />
+      </GameProvider>
+    </SafeAreaProvider>
   );
 }
 
