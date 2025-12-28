@@ -24,7 +24,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0f1f1a"
-      }
+      },
+      "package": "com.mdtta.ecpoker"
     },
     "web": {},
     "extra": {
