@@ -8,7 +8,7 @@ interface GameContextValue extends GameState {
   removePlayer: (playerId: string) => void;
   togglePlayerStatus: (playerId: string, status: PlayerStatus) => void;
   previewRound: (round: RoundInput) => void;
-  confirmPendingRound: () => void;
+  confirmPendingRound: (roundOverride?: RoundInput) => void;
   recordRound: (round: RoundInput) => void;
   undoLastRound: () => void;
   advanceDealer: () => void;
@@ -67,13 +67,14 @@ const persistPlayer = async (player: Player) => {
 
 const persistScores = async (gameId: string, players: Player[]) => {
   if (!hasSupabaseConfig || !supabase) {
-    console.warn('Supabase not configured; skip scores persist');
+    console.warn('Supabase not configured; skip scores persist', { hasSupabaseConfig, supabaseNull: !supabase });
     return;
   }
-  const rows = players.map((p) => ({ game_id: gameId, player_id: p.id, seat_no: p.seatNo, rank: p.rank }));
+  const rows = players.map((p) => ({ game_uuid: gameId, player_id: p.id, seat_no: p.seatNo, rank: p.rank }));
+  console.info('Persisting scores', { rows: rows.length, gameId });
   const { error } = await supabase.from('scores').insert(rows);
   if (error) {
-    console.error('Failed to persist scores', error.message, { rowsCount: rows.length, gameId });
+    console.error('Failed to persist scores', error.message, { rowsCount: rows.length, gameId, rows });
   } else {
     console.info('Scores persisted', { rows: rows.length, gameId });
   }
@@ -151,29 +152,37 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const confirmPendingRound = () => {
-    let after: (() => void) | null = null;
+  const confirmPendingRound = (roundOverride?: RoundInput) => {
     setState((prev) => {
-      if (!prev.pendingRound) return prev;
-      const record: RoundRecord = {
-        id: Math.random().toString(36).slice(2, 10),
-        createdAt: new Date().toISOString(),
-        ...prev.pendingRound,
-        nonHouseScore: 0,
-      };
-      const snapshotPlayers = prev.players;
-      after = () => void persistScores(prev.gameId, snapshotPlayers);
-      const nextDealer = nextDealerSeat(prev.pendingRound.dealerSeat, prev.players);
+      const round = roundOverride ?? prev.pendingRound;
+      if (!round) return prev;
+
+      const roundInput: RoundInput = { ...round, levelSteps: round.levelSteps ?? 1 } as RoundInput;
+      const basePlayers = prev.pendingBasePlayers ?? prev.players;
+      const { updatedPlayers } = applyRound(basePlayers, roundInput);
+
+      void persistScores(prev.gameId, updatedPlayers);
+
+      const nextDealer = nextDealerSeat(roundInput.dealerSeat, updatedPlayers);
+
       return {
         ...prev,
         roundIndex: prev.roundIndex + 1,
-        history: [...prev.history, record],
+        history: [
+          ...prev.history,
+          {
+            id: Math.random().toString(36).slice(2, 10),
+            createdAt: new Date().toISOString(),
+            ...roundInput,
+            nonHouseScore: 0,
+          },
+        ],
         currentDealerSeat: nextDealer,
         pendingRound: null,
         pendingBasePlayers: null,
+        players: updatedPlayers,
       };
     });
-    if (after) after();
   };
 
   const recordRound = (round: RoundInput) => {

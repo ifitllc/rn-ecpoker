@@ -11,9 +11,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f1f1a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mdtta.ecpoker",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,6 +27,16 @@
       }
     },
     "web": {},
-    "extra": {}
+    "extra": {
+      "eas": {
+        "projectId": "cd65a724-6308-4276-8c17-6546bd44d4cf"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cd65a724-6308-4276-8c17-6546bd44d4cf"
+    }
   }
 }

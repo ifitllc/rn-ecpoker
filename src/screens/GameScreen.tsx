@@ -12,6 +12,7 @@ const GameScreen = () => {
   const [helperIds, setHelperIds] = useState<string[]>([]);
   const [houseWon, setHouseWon] = useState(true);
   const [levelSteps, setLevelSteps] = useState(1);
+  const [canSubmit, setCanSubmit] = useState(false);
 
   const maxHouseSize = activePlayers.length === 6
     ? 3
@@ -63,7 +64,8 @@ const GameScreen = () => {
   const submit = () => {
     const round = commitRound(houseWon);
     if (!round) return;
-    confirmPendingRound();
+    confirmPendingRound(round);
+    setCanSubmit(false);
     setHelperIds([]);
     setFirstCallerId(null);
     setHouseWon(true);
@@ -73,6 +75,7 @@ const GameScreen = () => {
   const handleOutcomeSelect = (outcome: boolean) => {
     // 仅切换胜负选择，不立刻结算，防止 Round No 先行递增
     setHouseWon(outcome);
+    setCanSubmit(true);
     commitRound(outcome);
   };
 
@@ -156,8 +159,12 @@ const GameScreen = () => {
               <Text style={styles.toggleText}>闲家赢</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={[styles.primaryBtn, styles.primaryFlex]} onPress={submit}>
-            <Text style={styles.primaryText}>确认并下一轮 *</Text>
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.primaryFlex, !canSubmit && styles.primaryBtnDisabled]}
+            onPress={submit}
+            disabled={!canSubmit}
+          >
+            <Text style={[styles.primaryText, !canSubmit && styles.primaryTextDisabled]}>确认并下一轮 *</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -233,7 +240,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+  primaryBtnDisabled: {
+    backgroundColor: '#9aa5a6',
+  },
   primaryText: { color: '#122013', fontWeight: '800', fontSize: 16 },
+  primaryTextDisabled: { color: '#444c45' },
   bottomBarWrapper: {
     position: 'absolute',
     left: 0,
