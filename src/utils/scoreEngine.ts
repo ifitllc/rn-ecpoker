@@ -44,10 +44,10 @@ export const applyRound = (
         if (isFirst) change += 1;
       }
     } else {
-      if (isHouse) {
-        change -= 1;
-      } else {
+      if (!isHouse) {
         change += round.levelSteps;
+      } else if (isFirst) {
+        change -= 1;
       }
     }
 

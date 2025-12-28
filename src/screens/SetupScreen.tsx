@@ -5,7 +5,16 @@ import { Player } from '../types';
 import { supabase, hasSupabaseConfig } from '../services/supabaseClient';
 
 const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') => void }> = ({ onNavigate }) => {
-  const { players, addPlayer, removePlayer, togglePlayerStatus, currentDealerSeat, startNewGame, resetGame } = useGame();
+  const {
+    players,
+    history,
+    addPlayer,
+    removePlayer,
+    togglePlayerStatus,
+    currentDealerSeat,
+    startNewGame,
+    resetGame,
+  } = useGame();
   const [name, setName] = useState('');
   const [seat, setSeat] = useState('');
   const [seatDirty, setSeatDirty] = useState(false);
@@ -175,7 +184,7 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
         <TouchableOpacity
           style={[styles.primaryBtn, styles.footerBtn]}
           onPress={() => {
-            startNewGame();
+            if (history.length === 0) startNewGame();
             onNavigate('game');
           }}
           accessibilityLabel="Start scoring"

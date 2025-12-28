@@ -79,6 +79,15 @@ const GameScreen = () => {
     commitRound(outcome);
   };
 
+  const handleUndo = () => {
+    undoLastRound();
+    setHelperIds([]);
+    setFirstCallerId(null);
+    setHouseWon(true);
+    setLevelSteps(1);
+    setCanSubmit(false);
+  };
+
   const houseIds = useMemo(() => new Set([firstCallerId, ...helperIds]), [firstCallerId, helperIds]);
 
   return (
@@ -107,11 +116,14 @@ const GameScreen = () => {
                 ]}
                 onPress={() => toggleHouseMember(p.id, p.status !== 'active')}
               >
-                <View style={{ flex: 1 }}>
+                <View style={styles.playerLeft}>
                   <Text style={styles.playerName}>
                     {p.seatNo}. {p.name} {isDealerMark ? ' *' : ''}
                   </Text>
-                  <Text style={styles.playerMeta}>Rank: {formatRank(p.rank)}</Text>
+                  <Text style={styles.playerMeta}>{p.status === 'active' ? 'Active' : 'Frozen'}</Text>
+                </View>
+                <View style={styles.playerRankCol} pointerEvents="none">
+                  <Text style={styles.rankBadge}>{formatRank(p.rank)}</Text>
                 </View>
                 <View style={styles.tags}>
                   {isFirst && <Text style={styles.firstFlag}>🟢</Text>}
@@ -147,7 +159,7 @@ const GameScreen = () => {
                 <Text style={styles.stepText}>+</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.undoBtn} onPress={undoLastRound}>
+            <TouchableOpacity style={styles.undoBtn} onPress={handleUndo}>
               <Text style={styles.secondaryText}>撤销</Text>
             </TouchableOpacity>
           </View>
@@ -279,9 +291,12 @@ const styles = StyleSheet.create({
   },
   frozenRow: { backgroundColor: '#3a3f46', opacity: 0.7 },
   dealerRow: { borderColor: '#f4d35e' },
+  playerLeft: { width: 170, gap: 2 },
   playerName: { color: '#e8f1ec', fontSize: 16, fontWeight: '700' },
   playerMeta: { color: '#7fa28b', fontSize: 12 },
-  tags: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  playerRankCol: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  rankBadge: { color: '#fefae0', fontSize: 28, fontWeight: '900' },
+  tags: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 96, justifyContent: 'flex-end' },
   firstFlag: { fontSize: 16 },
   helperFlag: { fontSize: 16 },
   freezeBtn: {

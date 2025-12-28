@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { GameState, Player, PlayerStatus, RoundInput, RoundRecord } from '../types';
 import { applyRound, nextDealerSeat } from '../utils/scoreEngine';
 import { hasSupabaseConfig, supabase } from '../services/supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface GameContextValue extends GameState {
   addPlayer: (name: string, seatNo: number, options?: { persist?: boolean; id?: string }) => void;
@@ -38,6 +39,21 @@ const buildInitialState = (): GameState => ({
   pendingRound: null,
   pendingBasePlayers: null,
 });
+
+const STORAGE_KEY = 'ecpoker/game-state/v1';
+
+const hydrateState = (value: Partial<GameState> | null): GameState => {
+  const base = buildInitialState();
+  if (!value) return base;
+  return {
+    ...base,
+    ...value,
+    players: value.players ?? base.players,
+    history: value.history ?? base.history,
+    pendingRound: null,
+    pendingBasePlayers: null,
+  };
+};
 
 const replayHistory = (players: Player[], history: RoundRecord[]) => {
   let current = players.map((p) => ({ ...p, rank: 2 }));
@@ -82,6 +98,42 @@ const persistScores = async (gameId: string, players: Player[]) => {
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<GameState>(buildInitialState());
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw && mounted) {
+          const parsed = JSON.parse(raw);
+          const restored = parsed?.version === 1 ? (parsed.state as Partial<GameState>) : (parsed as Partial<GameState>);
+          setState(hydrateState(restored));
+        }
+      } catch (err) {
+        console.error('Failed to hydrate game state', err);
+      } finally {
+        if (mounted) setHydrated(true);
+      }
+    };
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const persist = async () => {
+      try {
+        const payload = { version: 1, state: { ...state, pendingRound: null, pendingBasePlayers: null } };
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.error('Failed to persist game state', err);
+      }
+    };
+    void persist();
+  }, [state, hydrated]);
 
   const addPlayer = (name: string, seatNo: number, options?: { persist?: boolean; id?: string }) => {
     const shouldPersist = options?.persist !== false;
@@ -214,6 +266,14 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const undoLastRound = () => {
     setState((prev) => {
+      if (prev.pendingRound && prev.pendingBasePlayers) {
+        return {
+          ...prev,
+          players: prev.pendingBasePlayers,
+          pendingRound: null,
+          pendingBasePlayers: null,
+        };
+      }
       if (!prev.history.length) return prev;
       const nextHistory = prev.history.slice(0, -1);
       const resetPlayers = prev.players.map((p) => ({ ...p, rank: 2 }));
