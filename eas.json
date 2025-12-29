@@ -1,11 +1,16 @@
 {
   "cli": {
-    "version": ">= 7.0.0"
+    "version": ">= 7.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "internal": {
       "distribution": "internal",
       "channel": "internal"
+    },
+    "production": {
+      "distribution": "store",
+      "channel": "production"
     }
   }
 }

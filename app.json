@@ -2,7 +2,7 @@
   "expo": {
     "name": "ECPoker",
     "slug": "ecpoker",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon-from-svg.png",
@@ -17,6 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mdtta.ecpoker",
+      "buildNumber": "40",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,7 +26,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#0f1f1a"
       },
-      "package": "com.mdtta.ecpoker"
+      "package": "com.mdtta.ecpoker",
+      "versionCode": 40
     },
     "web": {},
     "extra": {
