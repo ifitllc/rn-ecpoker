@@ -14,9 +14,12 @@ const GameScreen = () => {
   const [levelSteps, setLevelSteps] = useState(1);
   const [canSubmit, setCanSubmit] = useState(false);
 
-  const maxHouseSize = activePlayers.length === 6
-    ? 3
-    : Math.max(1, Math.floor((activePlayers.length - 1) / 2));
+  const maxHouseSize = Math.max(
+    1,
+    activePlayers.length % 2 === 0
+      ? activePlayers.length / 2
+      : Math.floor(activePlayers.length / 2),
+  );
 
   const totalHouseSelected = useMemo(() => {
     const helperCount = helperIds.length;
