@@ -8,6 +8,7 @@ interface GameContextValue extends GameState {
   addPlayer: (name: string, seatNo: number, options?: { persist?: boolean; id?: string }) => void;
   removePlayer: (playerId: string) => void;
   togglePlayerStatus: (playerId: string, status: PlayerStatus) => void;
+  swapPlayerSeat: (playerId: string, targetSeat: number) => void;
   previewRound: (round: RoundInput) => void;
   confirmPendingRound: (roundOverride?: RoundInput) => void;
   recordRound: (round: RoundInput) => void;
@@ -34,6 +35,7 @@ const buildInitialState = (): GameState => ({
   gameId: generateGameId(),
   roundIndex: 0,
   currentDealerSeat: 1,
+  lastDealerSeat: null,
   players: [],
   history: [],
   pendingRound: null,
@@ -50,6 +52,7 @@ const hydrateState = (value: Partial<GameState> | null): GameState => {
     ...value,
     players: value.players ?? base.players,
     history: value.history ?? base.history,
+    lastDealerSeat: value.lastDealerSeat ?? base.lastDealerSeat,
     pendingRound: null,
     pendingBasePlayers: null,
   };
@@ -180,15 +183,74 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...prev,
         players: remaining,
         currentDealerSeat: nextDealer,
+        lastDealerSeat: prev.lastDealerSeat === removedSeat ? null : prev.lastDealerSeat,
+      };
+    });
+  };
+
+  const swapPlayerSeat = (playerId: string, targetSeat: number) => {
+    setState((prev) => {
+      const target = prev.players.find((p) => p.id === playerId);
+      if (!target) return prev;
+
+      const desired = Math.max(1, targetSeat);
+      if (desired === target.seatNo) return prev;
+
+      const occupant = prev.players.find((p) => p.seatNo === desired);
+
+      const swapped = prev.players.map((p) => {
+        if (p.id === playerId) return { ...p, seatNo: desired };
+        if (occupant && p.id === occupant.id) return { ...p, seatNo: target.seatNo };
+        return p;
+      }).sort((a, b) => a.seatNo - b.seatNo);
+
+      let nextDealer = prev.currentDealerSeat;
+      const dealerSeat = prev.currentDealerSeat;
+
+      if (dealerSeat === target.seatNo) {
+        if (desired < dealerSeat) {
+          nextDealer = nextDealerSeat(dealerSeat, swapped);
+        } else if (desired > dealerSeat) {
+          nextDealer = dealerSeat;
+        }
+      }
+
+      return {
+        ...prev,
+        players: swapped,
+        currentDealerSeat: nextDealer,
       };
     });
   };
 
   const togglePlayerStatus = (playerId: string, status: PlayerStatus) => {
-    setState((prev) => ({
-      ...prev,
-      players: prev.players.map((p) => (p.id === playerId ? { ...p, status } : p)),
-    }));
+    setState((prev) => {
+      const target = prev.players.find((p) => p.id === playerId);
+      if (!target) return prev;
+
+      const players = prev.players.map((p) => (p.id === playerId ? { ...p, status } : p));
+
+      if (status === 'frozen' && target.seatNo === prev.currentDealerSeat) {
+        const nextSeat = nextDealerSeat(target.seatNo, players);
+        return {
+          ...prev,
+          players,
+          currentDealerSeat: nextSeat,
+          lastDealerSeat: target.seatNo,
+        };
+      }
+
+      if (status === 'active' && prev.lastDealerSeat === target.seatNo) {
+        return {
+          ...prev,
+          players,
+          currentDealerSeat: target.seatNo,
+          lastDealerSeat: null,
+        };
+      }
+
+      return { ...prev, players };
+    });
   };
 
   const previewRound = (round: RoundInput) => {
@@ -310,6 +372,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         roundIndex: 0,
         history: [],
         currentDealerSeat: nextDealer,
+        lastDealerSeat: null,
         players: resetPlayers,
         pendingRound: null,
         pendingBasePlayers: null,
@@ -327,6 +390,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addPlayer,
       removePlayer,
       togglePlayerStatus,
+      swapPlayerSeat,
       previewRound,
       confirmPendingRound,
       recordRound,

@@ -24,6 +24,7 @@ export interface GameState {
   gameId: string;
   roundIndex: number;
   currentDealerSeat: number;
+  lastDealerSeat: number | null;
   players: Player[];
   history: RoundRecord[];
   pendingRound: RoundInput | null;

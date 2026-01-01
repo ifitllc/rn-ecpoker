@@ -63,7 +63,6 @@ export const nextDealerSeat = (current: number, players: Player[]) => {
   const ordered = [...players].sort((a, b) => a.seatNo - b.seatNo);
   const active = ordered.filter((p) => p.status === 'active');
   if (!active.length) return current;
-  const idx = active.findIndex((p) => p.seatNo === current);
-  const next = idx === -1 ? 0 : (idx + 1) % active.length;
-  return active[next].seatNo;
+  const ahead = active.find((p) => p.seatNo > current);
+  return ahead ? ahead.seatNo : active[0].seatNo;
 };

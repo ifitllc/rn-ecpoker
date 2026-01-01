@@ -11,6 +11,7 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
     addPlayer,
     removePlayer,
     togglePlayerStatus,
+    swapPlayerSeat,
     currentDealerSeat,
     startNewGame,
     resetGame,
@@ -21,28 +22,42 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
   const [recentPlayers, setRecentPlayers] = useState<{ id: string; name: string }[]>([]);
   const [selectedRecentId, setSelectedRecentId] = useState<string | null>(null);
   const [loadingRecent, setLoadingRecent] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [checkingName, setCheckingName] = useState(false);
   const listRef = useRef<FlatList<Player>>(null);
+
+  const generateId = () =>
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
 
   const nextSeat = useMemo(() => {
     if (!players.length) return 1;
     return Math.max(...players.map((p) => p.seatNo)) + 1;
   }, [players]);
 
+  const maxSeat = useMemo(() => {
+    if (!players.length) return 0;
+    return Math.max(...players.map((p) => p.seatNo));
+  }, [players]);
+
   useEffect(() => {
     let cancelled = false;
-    const loadRecent = async () => {
-      if (!hasSupabaseConfig || !supabase) return;
-      setLoadingRecent(true);
-      const { data, error } = await supabase
-        .from('players')
-        .select('id, name, created_at')
-        .order('created_at', { ascending: false })
-        .limit(12);
-      if (!cancelled) {
-        if (!error && data) setRecentPlayers(data.map(({ id, name }) => ({ id, name })));
-        setLoadingRecent(false);
-      }
-    };
+      const loadRecent = async () => {
+        if (!hasSupabaseConfig || !supabase) return;
+        setLoadingRecent(true);
+        const { data, error } = await supabase
+          .from('players')
+          .select('id, name, updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(12);
+        if (!cancelled) {
+          if (!error && data) setRecentPlayers(data.map(({ id, name }) => ({ id, name })));
+          setLoadingRecent(false);
+        }
+      };
     loadRecent();
     return () => {
       cancelled = true;
@@ -58,22 +73,55 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
   }, [players.length]);
 
   const existingNames = useMemo(() => new Set(players.map((p) => p.name.trim().toLowerCase())), [players]);
-  const recentChoices = useMemo(
-    () =>
-      recentPlayers.map((p) => ({ ...p, disabled: existingNames.has(p.name.trim().toLowerCase()) })),
-    [recentPlayers, existingNames],
-  );
+    const recentChoices = useMemo(
+      () =>
+        recentPlayers.map((p) => ({ ...p, disabled: existingNames.has(p.name.trim().toLowerCase()) })),
+      [recentPlayers, existingNames],
+    );
 
-  const handleAdd = () => {
-    const parsed = parseInt(seat, 10);
-    const seatNo = Number.isNaN(parsed) ? nextSeat : parsed;
-    if (!name) return;
-    addPlayer(name.trim(), seatNo, { persist: !selectedRecentId, id: selectedRecentId ?? undefined });
-    setName('');
-    setSeat(String(seatNo + 1));
-    setSeatDirty(false);
-    setSelectedRecentId(null);
-  };
+    const checkNameExists = async (candidate: string) => {
+      if (!hasSupabaseConfig || !supabase) return null;
+      const { data, error } = await supabase
+        .from('players')
+        .select('id')
+        .ilike('name', candidate)
+        .limit(1)
+        .maybeSingle();
+      if (error && error.code !== 'PGRST116') {
+        console.warn('Failed to check duplicate player name', error.message);
+        return null;
+      }
+      return data?.id ?? null;
+    };
+
+    const handleAdd = async () => {
+      if (checkingName) return;
+      const parsed = parseInt(seat, 10);
+      const seatNo = Number.isNaN(parsed) ? nextSeat : parsed;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+
+      setCheckingName(true);
+      const existingId = await checkNameExists(trimmed);
+      setCheckingName(false);
+
+      const playerId = selectedRecentId ?? existingId ?? generateId();
+
+      setNameError(null);
+      addPlayer(trimmed, seatNo, { persist: false, id: playerId });
+
+      if (hasSupabaseConfig && supabase) {
+        const now = new Date().toISOString();
+        const payload = { id: playerId, name: trimmed, updated_at: now } as const;
+        const { error } = await supabase.from('players').upsert(payload);
+        if (error) console.warn('Failed to upsert player timestamp', error.message);
+      }
+
+      setName('');
+      setSeat(String(seatNo + 1));
+      setSeatDirty(false);
+      setSelectedRecentId(null);
+    };
 
   const renderPlayer = ({ item }: { item: Player }) => (
     <View style={[styles.playerRow, item.seatNo === currentDealerSeat && styles.dealerRow]}>
@@ -82,6 +130,22 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
         <Text style={styles.playerMeta}>Seat {item.seatNo} · Rank {item.rank}</Text>
       </View>
       <View style={styles.rowActions}>
+        <TouchableOpacity
+          style={styles.swapBtn}
+          onPress={() => swapPlayerSeat(item.id, item.seatNo - 1)}
+          disabled={item.seatNo <= 1}
+          accessibilityLabel={`Move ${item.name} up`}
+        >
+          <Text style={styles.swapText}>↑</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.swapBtn}
+          onPress={() => swapPlayerSeat(item.id, item.seatNo + 1)}
+          disabled={item.seatNo >= maxSeat}
+          accessibilityLabel={`Move ${item.name} down`}
+        >
+          <Text style={styles.swapText}>↓</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.chip, item.status === 'active' ? styles.activeChip : styles.frozenChip]}
           onPress={() => togglePlayerStatus(item.id, item.status === 'active' ? 'frozen' : 'active')}
@@ -110,17 +174,18 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
 
       <View style={styles.row}>
         <Text style={styles.label}>Add player</Text>
-        <TextInput
-          value={name}
-          onChangeText={(val) => {
-            setName(val);
-            setSelectedRecentId(null);
-          }}
-          onFocus={() => setSelectedRecentId(null)}
-          style={styles.input}
-          placeholder="Name"
-          placeholderTextColor="#789"
-        />
+          <TextInput
+            value={name}
+            onChangeText={(val) => {
+              setName(val);
+              setSelectedRecentId(null);
+              setNameError(null);
+            }}
+            onFocus={() => setSelectedRecentId(null)}
+            style={styles.input}
+            placeholder="Name"
+            placeholderTextColor="#789"
+          />
         <TextInput
           value={seat}
           onChangeText={setSeat}
@@ -134,6 +199,8 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
           <Text style={[styles.primaryText, styles.addText]}>➕</Text>
         </TouchableOpacity>
       </View>
+
+      {nameError && <Text style={styles.errorText}>{nameError}</Text>}
 
       <View style={styles.suggestionBox}>
         <View style={styles.suggestionHeader}>
@@ -221,6 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryText: { color: '#fefae0', fontWeight: '800', fontSize: 16 },
+  errorText: { color: '#f65a5a', fontSize: 12, marginTop: 4 },
   addBtn: {
     backgroundColor: '#2fd67f',
     paddingHorizontal: 18,
@@ -276,6 +344,13 @@ const styles = StyleSheet.create({
   freezeIconFrozen: { color: '#f65a5a' },
   freezeIconIdle: { color: '#9aa5a6' },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  swapBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#1f5a3c',
+  },
+  swapText: { color: '#fefae0', fontWeight: '800', fontSize: 14 },
   removeBtn: {
     paddingHorizontal: 10,
     paddingVertical: 8,
