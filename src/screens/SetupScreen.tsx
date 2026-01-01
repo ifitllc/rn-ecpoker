@@ -36,7 +36,7 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
       const { data, error } = await supabase
         .from('players')
         .select('id, name, created_at')
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(12);
       if (!cancelled) {
         if (!error && data) setRecentPlayers(data.map(({ id, name }) => ({ id, name })));

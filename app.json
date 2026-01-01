@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mdtta.ecpoker",
-      "buildNumber": "40",
+      "buildNumber": "41",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -27,7 +27,7 @@
         "backgroundColor": "#0f1f1a"
       },
       "package": "com.mdtta.ecpoker",
-      "versionCode": 40
+      "versionCode": 41
     },
     "web": {},
     "extra": {
