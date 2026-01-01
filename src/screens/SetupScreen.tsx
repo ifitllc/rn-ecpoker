@@ -24,6 +24,8 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [checkingName, setCheckingName] = useState(false);
+  const [swapSourceId, setSwapSourceId] = useState<string | null>(null);
+  const [swapTargetId, setSwapTargetId] = useState<string | null>(null);
   const listRef = useRef<FlatList<Player>>(null);
 
   const generateId = () =>
@@ -73,11 +75,11 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
   }, [players.length]);
 
   const existingNames = useMemo(() => new Set(players.map((p) => p.name.trim().toLowerCase())), [players]);
-    const recentChoices = useMemo(
-      () =>
-        recentPlayers.map((p) => ({ ...p, disabled: existingNames.has(p.name.trim().toLowerCase()) })),
-      [recentPlayers, existingNames],
-    );
+      const recentChoices = useMemo(
+        () =>
+          recentPlayers.map((p) => ({ ...p, disabled: existingNames.has(p.name.trim().toLowerCase()) })),
+        [recentPlayers, existingNames],
+      );
 
     const checkNameExists = async (candidate: string) => {
       if (!hasSupabaseConfig || !supabase) return null;
@@ -94,18 +96,33 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
       return data?.id ?? null;
     };
 
-    const handleAdd = async () => {
+    const handleAdd = async (override?: { name?: string; seatNo?: number; playerId?: string }) => {
       if (checkingName) return;
-      const parsed = parseInt(seat, 10);
+      const parsed = override?.seatNo ?? parseInt(seat, 10);
       const seatNo = Number.isNaN(parsed) ? nextSeat : parsed;
-      const trimmed = name.trim();
+      const trimmed = (override?.name ?? name).trim();
       if (!trimmed) return;
 
+      if (swapSourceId) {
+        // Prefer explicit target seat if selected; otherwise use typed seat
+        const targetSeatFromId = players.find((p) => p.id === swapTargetId)?.seatNo;
+        const seatTarget = targetSeatFromId ?? seatNo;
+        swapPlayerSeat(swapSourceId, seatTarget);
+        setSwapSourceId(null);
+        setSwapTargetId(null);
+        setSelectedRecentId(null);
+        setName('');
+        setSeat('');
+        setSeatDirty(false);
+        setNameError(null);
+        return;
+      }
+
       setCheckingName(true);
-      const existingId = await checkNameExists(trimmed);
+      const existingId = override?.playerId ?? (await checkNameExists(trimmed));
       setCheckingName(false);
 
-      const playerId = selectedRecentId ?? existingId ?? generateId();
+      const playerId = override?.playerId ?? selectedRecentId ?? existingId ?? generateId();
 
       setNameError(null);
       addPlayer(trimmed, seatNo, { persist: false, id: playerId });
@@ -123,52 +140,109 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
       setSelectedRecentId(null);
     };
 
-  const renderPlayer = ({ item }: { item: Player }) => (
-    <View style={[styles.playerRow, item.seatNo === currentDealerSeat && styles.dealerRow]}>
-      <View>
-        <Text style={styles.playerName}>{item.name}</Text>
-        <Text style={styles.playerMeta}>Seat {item.seatNo} · Rank {item.rank}</Text>
-      </View>
-      <View style={styles.rowActions}>
-        <TouchableOpacity
-          style={styles.swapBtn}
-          onPress={() => swapPlayerSeat(item.id, item.seatNo - 1)}
-          disabled={item.seatNo <= 1}
-          accessibilityLabel={`Move ${item.name} up`}
-        >
-          <Text style={styles.swapText}>↑</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.swapBtn}
-          onPress={() => swapPlayerSeat(item.id, item.seatNo + 1)}
-          disabled={item.seatNo >= maxSeat}
-          accessibilityLabel={`Move ${item.name} down`}
-        >
-          <Text style={styles.swapText}>↓</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.chip, item.status === 'active' ? styles.activeChip : styles.frozenChip]}
-          onPress={() => togglePlayerStatus(item.id, item.status === 'active' ? 'frozen' : 'active')}
-          accessibilityLabel={item.status === 'active' ? 'Freeze player' : 'Unfreeze player'}
-        >
-          <Text
-            style={[styles.chipText, item.status === 'frozen' ? styles.freezeIconFrozen : styles.freezeIconIdle]}
-          >
-            {item.status === 'active' ? '⛔' : '🚫'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.removeBtn}
-          onPress={() => removePlayer(item.id)}
-          accessibilityLabel={`Remove ${item.name}`}
-        >
-          <Text style={styles.removeText}>🗑️</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    const handleSelectPlayer = (item: Player) => {
+        if (swapSourceId && swapSourceId !== item.id) {
+          setSeat(String(item.seatNo));
+        setSwapTargetId(item.id);
+          setSeatDirty(true);
+          setNameError(null);
+          return;
+        }
+        setName(item.name);
+        setSeat(String(item.seatNo));
+      setSelectedRecentId(item.id);
+      setSwapTargetId(null);
+        setSeatDirty(true);
+        setNameError(null);
+      };
 
-  return (
+    const renderPlayer = ({ item }: { item: Player }) => (
+      <TouchableOpacity
+        style={[styles.playerRow, item.seatNo === currentDealerSeat && styles.dealerRow]}
+        onPress={() => handleSelectPlayer(item)}
+        activeOpacity={0.8}
+      >
+        <View>
+          <Text style={styles.playerName}>{item.name}</Text>
+          <Text style={styles.playerMeta}>Seat {item.seatNo} · Rank {item.rank}</Text>
+        </View>
+        <View style={styles.rowActions}>
+          <TouchableOpacity
+            style={[styles.swapBtn, swapSourceId === item.id && styles.swapBtnActive]}
+            onPress={() => {
+              setSwapSourceId((prev) => (prev === item.id ? null : item.id));
+                setSwapTargetId(null);
+              setName(item.name);
+              setSeat(String(item.seatNo));
+              setSelectedRecentId(item.id);
+              setSeatDirty(true);
+              setNameError(null);
+            }}
+            accessibilityLabel={`Select ${item.name} to swap seats`}
+          >
+            <Text style={[styles.swapText, swapSourceId === item.id && styles.swapTextActive]}>⇆</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.swapBtn}
+            onPress={() => swapPlayerSeat(item.id, item.seatNo - 1)}
+            disabled={item.seatNo <= 1}
+            accessibilityLabel={`Move ${item.name} up`}
+          >
+            <Text style={styles.swapText}>↑</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.swapBtn}
+            onPress={() => swapPlayerSeat(item.id, item.seatNo + 1)}
+            disabled={item.seatNo >= maxSeat}
+            accessibilityLabel={`Move ${item.name} down`}
+          >
+            <Text style={styles.swapText}>↓</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.chip, item.status === 'active' ? styles.activeChip : styles.frozenChip]}
+            onPress={() => togglePlayerStatus(item.id, item.status === 'active' ? 'frozen' : 'active')}
+            accessibilityLabel={item.status === 'active' ? 'Freeze player' : 'Unfreeze player'}
+          >
+            <Text
+              style={[styles.chipText, item.status === 'frozen' ? styles.freezeIconFrozen : styles.freezeIconIdle]}
+            >
+              {item.status === 'active' ? '⛔' : '🚫'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={() => removePlayer(item.id)}
+            accessibilityLabel={`Remove ${item.name}`}
+          >
+            <Text style={styles.removeText}>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+
+    const lastRecentTap = useRef<number>(0);
+
+    const handleRecentPress = (p: { id: string; name: string }) => {
+      const now = Date.now();
+      const isDouble = now - lastRecentTap.current < 300;
+      lastRecentTap.current = now;
+      if (swapSourceId && swapSourceId !== p.id) {
+        setSwapTargetId(p.id);
+        setSeatDirty(true);
+        setSeat('');
+        setName(p.name);
+      } else {
+        setSelectedRecentId(p.id);
+        setName(p.name);
+        setSeatDirty(false);
+      }
+      if (isDouble) void handleAdd({ name: p.name, playerId: p.id });
+    };
+
+    const actionLabel = swapSourceId ? 'Swap seats' : selectedRecentId ? 'Update player' : 'Add player';
+    const actionIcon = swapSourceId ? '⇆' : selectedRecentId ? '✏️' : '➕';
+
+    return (
     <View style={styles.container}>
       <Text style={styles.title}>Setup Game</Text>
 
@@ -195,8 +269,12 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
           placeholder="Seat"
           placeholderTextColor="#789"
         />
-        <TouchableOpacity style={[styles.primaryBtn, styles.addBtn]} onPress={handleAdd} accessibilityLabel="Add player">
-          <Text style={[styles.primaryText, styles.addText]}>➕</Text>
+          <TouchableOpacity
+            style={[styles.primaryBtn, styles.addBtn]}
+            onPress={handleAdd}
+            accessibilityLabel={actionLabel}
+          >
+            <Text style={[styles.primaryText, styles.addText]}>{actionIcon}</Text>
         </TouchableOpacity>
       </View>
 
@@ -208,6 +286,11 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
           {loadingRecent && <Text style={styles.suggestionMeta}>Loading...</Text>}
           {!hasSupabaseConfig && <Text style={styles.suggestionMeta}>Supabase not configured</Text>}
         </View>
+        {swapSourceId && (
+            <Text style={styles.swapHint}>
+              已选择 {recentPlayers.find((p) => p.id === swapSourceId)?.name ?? '玩家'}，再选目标并点 {actionIcon} 确认交换
+            </Text>
+        )}
         <View style={styles.chipRow}>
           {recentChoices.length === 0 && !loadingRecent ? (
             <Text style={styles.suggestionMeta}>No players found</Text>
@@ -217,12 +300,12 @@ const SetupScreen: React.FC<{ onNavigate: (key: 'dashboard' | 'game' | 'setup') 
                 key={p.id}
                 style={[styles.suggestionChip, p.disabled && styles.suggestionChipDisabled]}
                 onPress={() => {
-                  if (p.disabled) return;
-                  setSelectedRecentId(p.id);
-                  setName(p.name);
-                  setSeatDirty(false);
+                  const isSelf = swapSourceId === p.id;
+                  if (isSelf) return;
+                  if (p.disabled && !swapSourceId) return;
+                  handleRecentPress(p);
                 }}
-                disabled={p.disabled}
+                disabled={p.disabled && !swapSourceId}
               >
                 <Text style={[styles.chipText, p.disabled && styles.suggestionChipTextDisabled]}>{p.name}</Text>
               </TouchableOpacity>
@@ -350,7 +433,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#1f5a3c',
   },
+  swapBtnActive: {
+    backgroundColor: '#f4d35e',
+  },
   swapText: { color: '#fefae0', fontWeight: '800', fontSize: 14 },
+  swapTextActive: { color: '#122013' },
+  swapHint: { color: '#dfe7dd', fontSize: 12, marginTop: 4 },
   removeBtn: {
     paddingHorizontal: 10,
     paddingVertical: 8,
