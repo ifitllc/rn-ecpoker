@@ -23,10 +23,12 @@ android/.gradle
 android/app/build
 android/build
 *.iml
+android/
 
 # iOS
 ios/Pods
 ios/build
+ios/
 
 # IDE
 .idea
