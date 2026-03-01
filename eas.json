@@ -6,11 +6,19 @@
   "build": {
     "internal": {
       "distribution": "internal",
-      "channel": "internal"
+      "channel": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ohsdlpmsfvgnslncxfsv.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_WLHecvYV28bWvsPzNTk-mw_UrtdgfsX"
+      }
     },
     "production": {
       "distribution": "store",
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ohsdlpmsfvgnslncxfsv.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_WLHecvYV28bWvsPzNTk-mw_UrtdgfsX"
+      }
     }
   }
 }

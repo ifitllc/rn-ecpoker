@@ -36,7 +36,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.mdtta.ecpoker',
-      buildNumber: '45',
+      buildNumber: '47',
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
       },
@@ -46,7 +46,7 @@ module.exports = {
         backgroundColor: '#0f1f1a',
       },
       package: 'com.mdtta.ecpoker',
-      versionCode: 45,
+      versionCode: 47,
     },
     web: {},
     extra: {
