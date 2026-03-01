@@ -37,3 +37,7 @@ ios/
 # Project docs not to commit
 instructions/
 docs/
+
+
+# exclude lodal builds
+*.ipa
