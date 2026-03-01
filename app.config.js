@@ -1,3 +1,23 @@
+const fs = require('fs');
+const path = require('path');
+
+// Load .env ourselves so values are always available, regardless of build method.
+function loadEnv() {
+  const envPath = path.resolve(__dirname, '.env');
+  if (!fs.existsSync(envPath)) return {};
+  const vars = {};
+  fs.readFileSync(envPath, 'utf8')
+    .split('\n')
+    .forEach((line) => {
+      const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)=(.*)$/);
+      if (m) vars[m[1]] = m[2].trim();
+    });
+  return vars;
+}
+
+const dotenv = loadEnv();
+const env = (key) => process.env[key] || dotenv[key] || '';
+
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
   expo: {
@@ -30,8 +50,8 @@ module.exports = {
     },
     web: {},
     extra: {
-      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+      EXPO_PUBLIC_SUPABASE_URL: env('EXPO_PUBLIC_SUPABASE_URL'),
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: env('EXPO_PUBLIC_SUPABASE_ANON_KEY'),
       eas: {
         projectId: 'cd65a724-6308-4276-8c17-6546bd44d4cf',
       },

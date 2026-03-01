@@ -52,6 +52,12 @@ npx expo start --android
 
 ## Building Locally
 
+Before your first local build (or after changing `app.config.js` / native dependencies), regenerate the native projects:
+
+```bash
+npx expo prebuild --clean
+```
+
 ### iOS (IPA for App Store)
 
 ```bash
@@ -113,13 +119,13 @@ This pushes an over-the-air update to all users on the `production` channel.
 
 ## Version Bumping
 
-Before each App Store / Play Store submission, bump the version in `app.json`:
+Before each App Store / Play Store submission, bump the version in `app.config.js`:
 
-| Field                        | Where           | Notes                              |
-|------------------------------|-----------------|------------------------------------|
-| `expo.version`               | `app.json`      | Semver string (e.g. `2.1.0`)      |
-| `expo.ios.buildNumber`       | `app.json`      | Incrementing integer as string     |
-| `expo.android.versionCode`   | `app.json`      | Incrementing integer               |
+| Field                        | Where              | Notes                              |
+|------------------------------|--------------------|------------------------------------|
+| `expo.version`               | `app.config.js`    | Semver string (e.g. `2.1.0`)      |
+| `expo.ios.buildNumber`       | `app.config.js`    | Incrementing integer as string     |
+| `expo.android.versionCode`   | `app.config.js`    | Incrementing integer               |
 
 App Store Connect rejects uploads if `version` is ≤ the previously approved version.
 
@@ -142,7 +148,7 @@ App Store Connect rejects uploads if `version` is ≤ the previously approved ve
 ├── docs/
 │   ├── app-plan.md
 │   └── db-schema.md
-├── app.json                 # Expo config
+├── app.config.js            # Expo config (dynamic)
 ├── eas.json                 # EAS Build profiles
 └── package.json
 ```
